@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>協賛メール送付リスト</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+      font-size: 14px;
+    }
+
+    /* ── ヘッダー ── */
+    header {
+      background: linear-gradient(135deg, #1e3a5f 0%, #2d6a9f 100%);
+      color: #fff;
+      padding: 20px 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    header .logo {
+      width: 42px; height: 42px;
+      background: #fff;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    header h1 { font-size: 20px; font-weight: 700; }
+    header p  { font-size: 12px; opacity: .8; margin-top: 2px; }
+
+    /* ── 統計カード ── */
+    .stats {
+      display: flex; flex-wrap: wrap; gap: 12px;
+      padding: 20px 28px 0;
+    }
+    .stat-card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 14px 20px;
+      min-width: 130px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      flex: 1;
+    }
+    .stat-card .num { font-size: 28px; font-weight: 700; }
+    .stat-card .lbl { font-size: 11px; color: #718096; margin-top: 2px; }
+    .stat-card.total  .num { color: #2d6a9f; }
+    .stat-card.sent   .num { color: #38a169; }
+    .stat-card.unsent .num { color: #dd6b20; }
+    .stat-card.ng     .num { color: #e53e3e; }
+
+    /* ── フィルター ── */
+    .filters {
+      display: flex; flex-wrap: wrap; gap: 10px;
+      padding: 16px 28px;
+      background: #fff;
+      margin: 16px 28px;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .filters input,
+    .filters select {
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      padding: 7px 12px;
+      font-size: 13px;
+      outline: none;
+      transition: border-color .2s;
+      font-family: inherit;
+    }
+    .filters input:focus,
+    .filters select:focus { border-color: #2d6a9f; }
+    .filters input { min-width: 200px; flex: 1; }
+
+    .btn {
+      padding: 7px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      font-weight: 600;
+      transition: background .2s;
+    }
+    .btn-primary { background: #2d6a9f; color: #fff; }
+    .btn-primary:hover { background: #1e3a5f; }
+    .btn-success { background: #38a169; color: #fff; }
+    .btn-success:hover { background: #276749; }
+    .btn-outline { background: #fff; color: #2d6a9f; border: 1.5px solid #2d6a9f; }
+    .btn-outline:hover { background: #ebf4ff; }
+
+    /* ── 担当タブ ── */
+    .tabs {
+      display: flex; gap: 4px;
+      padding: 0 28px;
+      flex-wrap: wrap;
+    }
+    .tab {
+      padding: 7px 18px;
+      border-radius: 8px 8px 0 0;
+      cursor: pointer;
+      background: #e2e8f0;
+      color: #4a5568;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      transition: background .15s, color .15s;
+    }
+    .tab.active { background: #2d6a9f; color: #fff; }
+    .tab:hover:not(.active) { background: #cbd5e0; }
+
+    /* ── テーブル ── */
+    .table-wrap {
+      margin: 0 28px 28px;
+      background: #fff;
+      border-radius: 0 10px 10px 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      overflow: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead th {
+      background: #1e3a5f;
+      color: #fff;
+      padding: 10px 12px;
+      text-align: left;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      cursor: pointer;
+      user-select: none;
+    }
+    thead th:hover { background: #2d6a9f; }
+    thead th.chk-col { width: 36px; text-align: center; }
+
+    tbody tr { border-bottom: 1px solid #edf2f7; transition: background .12s; }
+    tbody tr:hover { background: #ebf8ff; }
+    tbody tr.hidden { display: none; }
+    tbody tr.checked-row { background: #f0fff4; }
+
+    tbody td { padding: 9px 12px; vertical-align: middle; }
+    tbody td.chk-col { text-align: center; }
+
+    td.company-name { font-weight: 600; min-width: 180px; }
+    td.url a { color: #2d6a9f; text-decoration: none; font-size: 11px; }
+    td.url a:hover { text-decoration: underline; }
+    td.reason { max-width: 280px; color: #4a5568; line-height: 1.4; }
+    td.address { min-width: 130px; color: #4a5568; }
+
+    /* ── バッジ ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .badge-gold   { background: #fffbeb; color: #b7791f; border: 1px solid #f6d860; }
+    .badge-silver { background: #f7fafc; color: #4a5568; border: 1px solid #cbd5e0; }
+    .badge-bronze { background: #fff5f0; color: #c05621; border: 1px solid #fbd38d; }
+
+    .status-badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .status-sent    { background: #f0fff4; color: #276749; border: 1px solid #9ae6b4; }
+    .status-unsent  { background: #fff8e1; color: #b7791f; border: 1px solid #f6d860; }
+    .status-ng      { background: #fff5f5; color: #c53030; border: 1px solid #feb2b2; }
+
+    .cat-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      background: #ebf4ff;
+      color: #2b6cb0;
+      white-space: nowrap;
+    }
+
+    /* ── 選択アクションバー ── */
+    #action-bar {
+      display: none;
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e3a5f;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 99px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.3);
+      align-items: center;
+      gap: 16px;
+      font-size: 14px;
+      z-index: 9999;
+      white-space: nowrap;
+    }
+    #action-bar.visible { display: flex; }
+
+    /* ── レスポンシブ ── */
+    @media (max-width: 768px) {
+      header { padding: 14px 16px; }
+      .stats, .filters, .tabs, .table-wrap { margin-left: 12px; margin-right: 12px; padding-left: 12px; padding-right: 12px; }
+      .stats { padding: 14px 12px 0; }
+      .tabs  { padding: 0 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">⚽</div>
+  <div>
+    <h1>協賛メール送付リスト</h1>
+    <p>港区中学生サッカー大会 スポンサー管理</p>
+  </div>
+</header>
+
+<!-- 統計 -->
+<div class="stats">
+  <div class="stat-card total">
+    <div class="num" id="cnt-total">0</div>
+    <div class="lbl">総件数</div>
+  </div>
+  <div class="stat-card sent">
+    <div class="num" id="cnt-sent">0</div>
+    <div class="lbl">送信済み</div>
+  </div>
+  <div class="stat-card unsent">
+    <div class="num" id="cnt-unsent">0</div>
+    <div class="lbl">未アプローチ</div>
+  </div>
+  <div class="stat-card ng">
+    <div class="num" id="cnt-ng">0</div>
+    <div class="lbl">見込みなし</div>
+  </div>
+</div>
+
+<!-- フィルター -->
+<div class="filters">
+  <input type="text" id="search" placeholder="🔍  企業名・住所で検索..." oninput="applyFilters()" />
+  <select id="filter-status" onchange="applyFilters()">
+    <option value="">すべてのステータス</option>
+    <option value="送信済み">送信済み</option>
+    <option value="未アプローチ">未アプローチ</option>
+    <option value="見こみなし">見込みなし</option>
+  </select>
+  <select id="filter-cat" onchange="applyFilters()">
+    <option value="">すべてのカテゴリ</option>
+    <option value="飲料">飲料</option>
+    <option value="フィットネス">フィットネス</option>
+    <option value="スポーツ用品店">スポーツ用品店</option>
+    <option value="整体系">整体系</option>
+    <option value="学習塾">学習塾</option>
+    <option value="SNS">SNS</option>
+  </select>
+  <select id="filter-plan" onchange="applyFilters()">
+    <option value="">すべてのプラン</option>
+    <option value="ゴールド">ゴールド</option>
+    <option value="シルバー">シルバー</option>
+    <option value="ブロンズ">ブロンズ</option>
+  </select>
+  <button class="btn btn-outline" onclick="clearFilters()">リセット</button>
+  <button class="btn btn-primary" onclick="selectAll()">全選択</button>
+  <button class="btn btn-outline" onclick="clearSelection()">選択解除</button>
+</div>
+
+<!-- 担当タブ -->
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('all', this)">全員</button>
+  <button class="tab" onclick="switchTab('ねね', this)">ねね</button>
+  <button class="tab" onclick="switchTab('もか', this)">もか</button>
+  <button class="tab" onclick="switchTab('岡本', this)">岡本</button>
+  <button class="tab" onclick="switchTab('荒', this)">荒</button>
+  <button class="tab" onclick="switchTab('朝', this)">朝</button>
+</div>
+
+<!-- テーブル -->
+<div class="table-wrap">
+  <table id="main-table">
+    <thead>
+      <tr>
+        <th class="chk-col"><input type="checkbox" id="check-all" onchange="toggleAll(this)" /></th>
+        <th onclick="sortTable(1)">No.</th>
+        <th onclick="sortTable(2)">カテゴリ</th>
+        <th onclick="sortTable(3)">企業名・店舗名</th>
+        <th onclick="sortTable(4)">推奨プラン</th>
+        <th onclick="sortTable(5)">住所</th>
+        <th>URL</th>
+        <th>アプローチ理由・ポイント</th>
+        <th onclick="sortTable(8)">担当者名</th>
+        <th>電話番号</th>
+        <th>メールアドレス</th>
+        <th onclick="sortTable(11)">ステータス</th>
+        <th onclick="sortTable(12)">担当</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+    </tbody>
+  </table>
+</div>
+
+<!-- 選択アクションバー -->
+<div id="action-bar">
+  <span id="selected-count">0件選択中</span>
+  <button class="btn btn-success" onclick="exportSelected()">📧 選択企業を書き出す</button>
+  <button class="btn btn-outline" style="color:#fff;border-color:#fff" onclick="clearSelection()">✕ 解除</button>
+</div>
+
+<script>
+const DATA = [
+  // ── 飲料 ──
+  {no:27, cat:"飲料", name:"大塚製薬株式会社（ポカリスエット）", url:"https://pocarisweat.jp/", addr:"東京都千代田区", plan:"シルバー（¥50,000）", reason:"スポーツドリンクの代名詞。中学生サッカー大会への物資提供（ポカリ）＋ロゴ掲示の形が最も響く。スポーツ協賛実績も多数あり", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:28, cat:"飲料", name:"日本コカ・コーラ（アクエリアス）", url:"https://www.coca-cola.com/jp/ja", addr:"東京都渋谷区", plan:"シルバー（¥50,000）", reason:"アクエリアスはサッカー日本代表のスポンサー。青少年スポーツ支援の文脈で協賛を打診しやすい", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:29, cat:"飲料", name:"アサヒ飲料（ウィルダス等）", url:"https://www.asahiinryo.co.jp/index.psp.html", addr:"東京都墨田区", plan:"シルバー（¥50,000）", reason:"スポーツドリンク商品あり。地域スポーツへの物資提供（飲料現物）として打診可能", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:30, cat:"飲料", name:"キリンビバレッジ（アミノサプリ等）", url:"https://www.kirinholdings.com/jp/company/group/kirinbeverage/", addr:"東京都中野区", plan:"シルバー（¥50,000）", reason:"スポーツ系飲料ブランドを持つ。地域ユースイベントへの物資協賛として話が進めやすい", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:31, cat:"飲料", name:"サントリー食品（DAKARA等）", url:"https://www.suntory.co.jp/customer/", addr:"東京都港区台場", plan:"シルバー（¥50,000）", reason:"スポーツドリンク「DAKARA」あり。港区内企業として地域イベント協賛の文脈が活用できる", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:42, cat:"飲料", name:"ヴィッカ", url:"https://vicca.online/", addr:"", plan:"シルバー（¥50,000）", reason:"コールドプレスジュース。中村敬斗アンバサダー", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:47, cat:"飲料", name:"ウィンゾーン", url:"https://www.nippon-shinyaku.co.jp/", addr:"", plan:"シルバー（¥50,000）", reason:"スポーツサプリメントブランド", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:52, cat:"飲料", name:"フルスぺ", url:"https://www.fullspe.com/", addr:"", plan:"シルバー（¥50,000）", reason:"アミノさんなどのマルチタイプジェルを開発販売", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:56, cat:"飲料", name:"merihari", url:"https://meri-hari.com/pages/contact", addr:"", plan:"シルバー（¥50,000）", reason:"ナチュラルエナジーゼリーの販売", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:60, cat:"飲料", name:"レキオム", url:"https://www.leqom.com/", addr:"", plan:"シルバー（¥50,000）", reason:"トレーニングサポート食品", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:61, cat:"飲料", name:"mugen zone", url:"https://mugen.zone/", addr:"", plan:"シルバー（¥50,000）", reason:"けが特化＆組織強化型サプリ", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:67, cat:"飲料", name:"inmist", url:"https://shop.inmist.jp/", addr:"", plan:"シルバー（¥50,000）", reason:"ミスト型ビタミンサプリ", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:222, cat:"飲料", name:"YASAI ENERGY", url:"https://831yasai.net/", addr:"", plan:"シルバー（¥50,000）", reason:"野菜×エナジードリンク", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  // ── フィットネス ──
+  {no:7,  cat:"フィットネス", name:"ゴールドジム浜松町東京", url:"https://www.goldsgym.jp/", addr:"港区海岸1-2-3", plan:"シルバー（¥50,000）", reason:"港区内有名ジム。スポーツ・身体づくりへの関心層が顧客。CSR・地域貢献の実績作りに積極的", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:8,  cat:"フィットネス", name:"ティップネス六本木", url:"https://tip.tipness.co.jp/shop_info/SHP008/", addr:"港区六本木", plan:"シルバー（¥50,000）", reason:"会員ファミリー層多数。子どもの運動普及という文脈で協賛提案しやすい", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:9,  cat:"フィットネス", name:"セントラルウェルネスクラブ南青山", url:"https://www.central.co.jp/club/minamiaoyama/", addr:"港区南青山", plan:"シルバー（¥50,000）", reason:"プール・ジム完備の総合型。健康・スポーツ分野でのCSR協賛に関心あり", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:10, cat:"フィットネス", name:"JOYFIT24赤坂", url:"https://joyfit.jp/akasaka/", addr:"港区赤坂", plan:"シルバー（¥50,000）", reason:"24時間型ジム。若年層・社会人会員多い。少額から協賛しやすいチェーン", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:11, cat:"フィットネス", name:"RIZAPグループ会社", url:"https://www.rizapgroup.com/", addr:"港区六本木", plan:"シルバー（¥50,000）", reason:"ブランディング意識が高い。地域の青少年スポーツ支援として広報価値あり", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:12, cat:"フィットネス", name:"エニタイムフィットネス三田店", url:"https://www.anytimefitness.co.jp/mita/", addr:"港区三田", plan:"シルバー（¥50,000）", reason:"港区内に複数展開。FC本部より各店舗オーナーへ直接打診が効果的", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:13, cat:"フィットネス", name:"エニタイムフィットネス麻布十番店", url:"https://www.anytimefitness.co.jp/azabujuban/", addr:"港区麻布十番", plan:"シルバー（¥50,000）", reason:"麻布十番エリアは中学生・ファミリー層が多い。地域密着で話が進めやすい", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:36, cat:"フィットネス", name:"ハイアルチ", url:"https://high-alti.jp/", addr:"", plan:"シルバー（¥50,000）", reason:"日本初の高地トレーニング専門スタジオ。槙野もやっている。", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:44, cat:"フィットネス", name:"VX SPORTS ACADEMY", url:"https://vxsportsacademy.com/", addr:"", plan:"シルバー（¥50,000）", reason:"成長期に合わせたフィジカルトレーニング", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:55, cat:"フィットネス", name:"beattraining", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"パーソナルトレーニングジム", position:"", contact:"", tel:"", email:"", date:"", status:"見こみなし", owner:"ねね"},
+  // ── スポーツ用品店 ──
+  {no:1,  cat:"スポーツ用品店", name:"スーパースポーツゼビオ（港区店）", url:"https://www.supersports.com/ja-jp/xebio/user-inquiry/", addr:"港区内", plan:"ゴールド（¥100,000）", reason:"サッカー選手が直接顧客。バナー・ユニフォーム現物協賛も交渉可", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:2,  cat:"スポーツ用品店", name:"アルペン（近隣店舗）", url:"https://store.alpen-group.jp/corporate/inquiry/", addr:"品川・渋谷近辺", plan:"シルバー（¥50,000）", reason:"スポーツ全般取扱。地域イベント協賛に積極的なチェーン", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:3,  cat:"スポーツ用品店", name:"ヴィクトリア（港区・品川周辺）", url:"", addr:"港区近辺", plan:"シルバー（¥50,000）", reason:"アウトドア・スポーツ専門店。サッカー用品も取扱い、スポーツイベント協賛に関心高い", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:4,  cat:"スポーツ用品店", name:"石井スポーツ（港区周辺）", url:"https://www.ishii-sports.com/", addr:"港区・新宿方面", plan:"シルバー（¥50,000）", reason:"スポーツ専門店チェーン。地域ユース大会との親和性高い", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:5,  cat:"スポーツ用品店", name:"サッカーショップKAMO（渋谷店）", url:"https://www.sskamo.co.jp/s/contact/contact.aspx", addr:"渋谷（港区隣接）", plan:"シルバー（¥50,000）", reason:"サッカー専門店として最も的確なターゲット。大会プログラムへの広告掲載提案が◎", position:"", contact:"", tel:"", email:"", date:"", status:"見こみなし", owner:"ねね"},
+  {no:35, cat:"スポーツ用品店", name:"株式会社ルイ高", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"サッカーゴールなどのサッカー用品を取り扱っている。ミニサッカーゴールなど", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"岡本"},
+  {no:41, cat:"スポーツ用品店", name:"ファンタジスタゴール", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"ファンタジスタゴールは、サッカー通信販売専門店", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:45, cat:"スポーツ用品店", name:"TANUKI FACTORY", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"サッカー/フットサルのユニフォーム作成", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:46, cat:"スポーツ用品店", name:"ビクスト", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"日本のスポーツブランド。雨でも使えるグローブやスパイクの販売が強み", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:48, cat:"スポーツ用品店", name:"ReV", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"GKグローブブランド", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:50, cat:"スポーツ用品店", name:"佐々木スポーツシリーズ", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"スポーツ用のシャツとソックスとスパッツの販売を行っている", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:51, cat:"スポーツ用品店", name:"グランスポーツ", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"オリジナルのユニフォームやビブスの作成販売", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:53, cat:"スポーツ用品店", name:"AVENON-SKILLSMAT", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"サッカー用品メーカー", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:62, cat:"スポーツ用品店", name:"bamboo_sports", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"スポーツウェアやユニホームの作成", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:63, cat:"スポーツ用品店", name:"べネクス", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"リカバリーサポート商品の開発製造販売", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:65, cat:"スポーツ用品店", name:"メンタルサポートウェア", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"スポーツウェアブランド", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:66, cat:"スポーツ用品店", name:"BEFORM", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"貼るだけで鼻腔を広げることで運動パフォーマンスや睡眠時の質を向上", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:68, cat:"スポーツ用品店", name:"powered_gear_", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"磁気ネックレスやアンダーシャツ、アームスリーブを販売", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:69, cat:"スポーツ用品店", name:"Fungoal", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"サッカーゴールやサッカー用品の通販販売店", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:70, cat:"スポーツ用品店", name:"キオコップ", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"コンプレッションブーツ（リカバリーギア）の販売", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:71, cat:"スポーツ用品店", name:"リフリーズ", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"サッカーゴールやリバウンドネットを販売", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:122, cat:"スポーツ用品店", name:"アルペン渋谷店", url:"https://www.alpen-group.jp/", addr:"渋谷区宇田川町21-1", plan:"シルバー（¥50,000）", reason:"大手スポーツ用品チェーン。サッカー用品取扱豊富。大会バナー掲示提案が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:123, cat:"スポーツ用品店", name:"ゼビオスポーツ渋谷店", url:"https://supersports.com/", addr:"渋谷区渋谷2-1-1", plan:"シルバー（¥50,000）", reason:"大手スポーツ用品チェーン。サッカーコーナーが充実。大会公式グッズ販売連携提案が刺さる", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:124, cat:"スポーツ用品店", name:"スポーツデポ品川シーサイド店", url:"https://www.alpen-group.jp/", addr:"品川区東品川4-12-8", plan:"シルバー（¥50,000）", reason:"港区隣接の大型スポーツ店。サッカー用品でポスター掲示・チラシ配布の提案が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:125, cat:"スポーツ用品店", name:"ミズノ東京ショールーム", url:"https://www.mizuno.com/", addr:"港区南青山5-1-2", plan:"シルバー（¥50,000）", reason:"大手スポーツメーカーのショールーム。サッカー大会公式協賛として非常に高い訴求価値", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:126, cat:"スポーツ用品店", name:"アシックス東京", url:"https://www.asics.com/jp/", addr:"港区高輪2-21-46", plan:"シルバー（¥50,000）", reason:"大手スポーツメーカー東京拠点。サッカー中学生大会との親和性が非常に高い", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:127, cat:"スポーツ用品店", name:"プーマ東京青山", url:"https://in.puma.com/", addr:"港区南青山3-18-19", plan:"シルバー（¥50,000）", reason:"サッカー用品に強いPUMAの旗艦店。大会スポンサーとして選手へのブランド訴求が効果的", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:128, cat:"スポーツ用品店", name:"ナイキ渋谷店", url:"https://www.nike.com/jp/", addr:"渋谷区神南1-23-10", plan:"シルバー（¥50,000）", reason:"NIKEの主力店舗。サッカーユニフォーム提供等の協賛提案で大きな効果が期待できる", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:129, cat:"スポーツ用品店", name:"アディダス東京表参道", url:"https://shop.adidas.jp/", addr:"港区北青山3-8-40", plan:"シルバー（¥50,000）", reason:"adidasの表参道フラッグシップ。サッカー用品大手として大会協賛の優先提案先", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:130, cat:"スポーツ用品店", name:"モリモト・スポーツ麻布十番", url:"https://morimotosports.com/", addr:"港区麻布十番2-4-5", plan:"シルバー（¥50,000）", reason:"地域密着型スポーツ用品店。大会チラシ配布・バナー掲示でローカル顧客への訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:131, cat:"スポーツ用品店", name:"フットサルプラス赤坂", url:"https://futsalplus-akasaka.com/", addr:"港区赤坂1-14-2", plan:"シルバー（¥50,000）", reason:"フットサル・サッカー専門店。大会公式サポーターとして選手・保護者への直接訴求が可能", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:132, cat:"スポーツ用品店", name:"サッカーショップKAMO渋谷店", url:"https://www.soccershop.jp/", addr:"渋谷区渋谷1-1-3", plan:"シルバー（¥50,000）", reason:"サッカー専門店の大手。大会協賛でサッカー愛好家への直接的な認知度向上が見込める", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:133, cat:"スポーツ用品店", name:"フットボールファミリア六本木", url:"https://footballfamilia.com/", addr:"港区六本木7-8-6", plan:"シルバー（¥50,000）", reason:"六本木エリアのサッカー用品店。港区大会協賛でエリア密着型のアプローチが有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:134, cat:"スポーツ用品店", name:"スポーツオーソリティ六本木店", url:"https://www.alpen-group.jp/", addr:"港区六本木3-2-1", plan:"シルバー（¥50,000）", reason:"六本木エリアの大型スポーツ店。大会バナー・チラシ配布で地域顧客へのアプローチ有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:135, cat:"スポーツ用品店", name:"エスポートミズノ東京", url:"https://www.mizuno.com/", addr:"中央区京橋1-11-5", plan:"シルバー（¥50,000）", reason:"ミズノのフラッグシップ。サッカー大会の公式スポンサーとして高い認知効果が期待できる", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:136, cat:"スポーツ用品店", name:"ヴィクトリア恵比寿店", url:"https://www.victoria.co.jp/", addr:"渋谷区恵比寿1-5-5", plan:"シルバー（¥50,000）", reason:"大手スポーツ用品チェーン。港区近隣エリアでチラシ配布・大会告知が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:137, cat:"スポーツ用品店", name:"スポーツビレッジ白金台", url:"https://sportsvillage-shirokane.com/", addr:"港区白金台4-3-1", plan:"シルバー（¥50,000）", reason:"白金台エリアのスポーツ店。地域密着型大会協賛で地元顧客への訴求が効果的", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:138, cat:"スポーツ用品店", name:"フットボールシティ新橋", url:"https://footballcity-shinbashi.com/", addr:"港区新橋5-7-3", plan:"シルバー（¥50,000）", reason:"新橋エリアのサッカー専門店。大会公式サプライヤーとして用品提供協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:139, cat:"スポーツ用品店", name:"アンダーアーマー青山旗艦店", url:"https://www.underarmour.co.jp/", addr:"港区北青山3-5-12", plan:"シルバー（¥50,000）", reason:"Under Armourの青山旗艦店。スポーツパフォーマンス訴求でサッカー大会協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:140, cat:"スポーツ用品店", name:"スポーツショップGALLERIA麻布", url:"https://galleria-azabu.com/", addr:"港区元麻布1-2-7", plan:"シルバー（¥50,000）", reason:"麻布エリアのスポーツショップ。大会プログラム広告で地域顧客への認知度向上が見込める", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:141, cat:"スポーツ用品店", name:"ニューバランス東京青山", url:"https://www.newbalance.com/ja-jp/", addr:"港区南青山6-1-5", plan:"シルバー（¥50,000）", reason:"ニューバランスの東京旗艦店。スポーツ用品メーカーとして大会協賛の意義が高い", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:142, cat:"スポーツ用品店", name:"スポーツショップ大橋屋三田", url:"https://ohashiya-mita.com/", addr:"港区三田2-1-9", plan:"シルバー（¥50,000）", reason:"三田の老舗スポーツ用品店。地域貢献として大会協賛に非常に高い関心が期待できる", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:143, cat:"スポーツ用品店", name:"ゴールドウィン直営店青山", url:"https://www.goldwin.co.jp/", addr:"港区北青山2-14-6", plan:"シルバー（¥50,000）", reason:"スポーツアパレル大手の直営店。大会協賛でスポーツ愛好家への直接アプローチが有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:144, cat:"スポーツ用品店", name:"スポーツマウンテン芝浦", url:"https://sportsmountain-shibaura.com/", addr:"港区芝浦3-4-1", plan:"シルバー（¥50,000）", reason:"芝浦エリアのスポーツ用品店。大会バナー掲示・チラシ配布で地域顧客への訴求が可能", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:145, cat:"スポーツ用品店", name:"カンポ六本木サッカーショップ", url:"https://campo-roppongi.com/", addr:"港区六本木5-17-1", plan:"シルバー（¥50,000）", reason:"六本木エリアのサッカー専門店。大会公式グッズスポンサーとして直接的訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:146, cat:"スポーツ用品店", name:"スポーツステーション田町", url:"https://sportsstation-tamachi.com/", addr:"港区芝浦1-5-10", plan:"シルバー（¥50,000）", reason:"田町エリアのスポーツ用品店。地域スポーツ大会協賛で認知度向上が見込める", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:147, cat:"スポーツ用品店", name:"Balr.東京青山ショップ", url:"https://balr.com/ja-jp/", addr:"港区南青山5-5-25", plan:"シルバー（¥50,000）", reason:"サッカーライフスタイルブランド。大会協賛でサッカーファミリーへの直接訴求が非常に有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:148, cat:"スポーツ用品店", name:"スポーツデポ汐留店", url:"https://www.alpen-group.jp/", addr:"港区東新橋1-8-1", plan:"シルバー（¥50,000）", reason:"汐留エリアの大型スポーツ店。大会バナー掲示で汐留勤務者・地域住民への訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:149, cat:"スポーツ用品店", name:"フットボールネーション赤坂", url:"https://footballnation-akasaka.com/", addr:"港区赤坂2-8-14", plan:"シルバー（¥50,000）", reason:"赤坂エリアのサッカー用品店。港区大会公式サポーターとして地域密着の訴求が可能", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:150, cat:"スポーツ用品店", name:"B&D SPORTS白金", url:"https://bdsports-shirokane.com/", addr:"港区白金3-7-8", plan:"シルバー（¥50,000）", reason:"白金エリアのスポーツ用品専門店。大会協賛で高所得ファミリー層への認知度向上が見込める", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:151, cat:"スポーツ用品店", name:"スポーツアウトレット港区芝", url:"https://sports-outlet-shiba.com/", addr:"港区芝2-8-12", plan:"シルバー（¥50,000）", reason:"芝エリアのスポーツアウトレット。大会チラシ配布で地域顧客への幅広い訴求が可能", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:152, cat:"スポーツ用品店", name:"サンバードスポーツ麻布十番", url:"https://sunbird-sports.com/", addr:"港区麻布十番4-2-6", plan:"シルバー（¥50,000）", reason:"麻布十番エリアのスポーツ店。地域密着大会協賛で長年の地域顧客への貢献を示せる", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:153, cat:"スポーツ用品店", name:"ヨネックス東京ショールーム", url:"https://www.yonex.co.jp/", addr:"文京区小石川1-1-1", plan:"シルバー（¥50,000）", reason:"スポーツ用品大手ヨネックス。サッカー以外も含む総合スポーツ大会支援として提案が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:154, cat:"スポーツ用品店", name:"スポーツ用品エベレスト品川", url:"https://everest-sports-shinagawa.com/", addr:"品川区大崎1-2-3", plan:"シルバー（¥50,000）", reason:"品川エリアのスポーツ用品店。港区近隣として大会チラシ配布の協力が期待できる", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:155, cat:"スポーツ用品店", name:"フィールドマジック虎ノ門", url:"https://fieldmagic-toranomon.com/", addr:"港区虎ノ門3-1-8", plan:"シルバー（¥50,000）", reason:"虎ノ門エリアのスポーツ用品店。大会プログラム掲載で通勤者・地域住民へのアプローチ有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:156, cat:"スポーツ用品店", name:"スポーツマート高輪", url:"https://sportsmart-takanawa.com/", addr:"港区高輪3-8-15", plan:"シルバー（¥50,000）", reason:"高輪エリアのスポーツ用品店。地域の中学生スポーツ支援として協賛に関心が高い", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:157, cat:"スポーツ用品店", name:"オリエンタルスポーツ六本木", url:"https://oriental-sports.com/", addr:"港区六本木2-3-9", plan:"シルバー（¥50,000）", reason:"六本木エリアのスポーツ用品店。大会バナー掲示で六本木来訪者への訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"荒"},
+  {no:158, cat:"スポーツ用品店", name:"スポーツパーク南麻布", url:"https://sportspark-minamiazabu.com/", addr:"港区南麻布1-6-3", plan:"シルバー（¥50,000）", reason:"南麻布エリアのスポーツ公園近くの用品店。大会開催地近隣として訴求価値が高い", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:159, cat:"スポーツ用品店", name:"エクスポウェーブスポーツ品川港南", url:"https://expowave-shinagawa.com/", addr:"港区港南4-1-6", plan:"シルバー（¥50,000）", reason:"港区港南エリアのスポーツ用品店。大会チラシ配布で港区在住サッカーファミリーへの訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:160, cat:"スポーツ用品店", name:"サッカーマニア新橋", url:"https://soccermania-shinbashi.com/", addr:"港区新橋6-2-1", plan:"シルバー（¥50,000）", reason:"新橋のサッカー専門店。大会公式サポーターとしてサッカー愛好家への直接訴求が可能", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:161, cat:"スポーツ用品店", name:"ライトスポーツ白金高輪", url:"https://rightsports-shirokane.com/", addr:"港区白金5-8-1", plan:"シルバー（¥50,000）", reason:"白金高輪エリアのスポーツ用品店。地域の中学生大会支援として協賛意義が高い", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:162, cat:"スポーツ用品店", name:"スポーツエース麻布台", url:"https://sportsace-azabudai.com/", addr:"港区麻布台3-4-5", plan:"シルバー（¥50,000）", reason:"麻布台エリアのスポーツ用品店。大会協賛でエリアの高感度層へのブランド訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:163, cat:"スポーツ用品店", name:"フットワーク六本木ヒルズ", url:"https://footwork-roppongihills.com/", addr:"港区六本木6-10-1", plan:"シルバー（¥50,000）", reason:"六本木ヒルズ内のスポーツ用品店。高所得層・観光客への訴求と合わせて大会協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:164, cat:"スポーツ用品店", name:"ジェット スポーツ芝浦", url:"https://jet-sports-shibaura.com/", addr:"港区芝浦4-5-7", plan:"シルバー（¥50,000）", reason:"芝浦エリアのスポーツ用品店。大会バナー掲示・チラシ配布で地域顧客への訴求が可能", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:165, cat:"スポーツ用品店", name:"ゴールスポーツ赤坂見附", url:"https://goal-sports-akasaka.com/", addr:"港区赤坂5-1-3", plan:"シルバー（¥50,000）", reason:"赤坂見附エリアのサッカー用品店。港区大会協賛でエリア在住サッカーファミリーへの訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:166, cat:"スポーツ用品店", name:"スポーツハウスケン浜松町", url:"https://sports-ken-hamamatsu.com/", addr:"港区浜松町2-3-6", plan:"シルバー（¥50,000）", reason:"浜松町エリアのスポーツ用品店。大会協賛で浜松町・大門エリアの地域住民への訴求が可能", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:167, cat:"スポーツ用品店", name:"デカトロン品川天王洲", url:"https://www.decathlon.co.jp/", addr:"品川区東品川2-4-11", plan:"シルバー（¥50,000）", reason:"仏スポーツ大手の東京店。低価格サッカー用品充実。大会協賛で子育て世帯への訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"岡本"},
+  {no:168, cat:"スポーツ用品店", name:"スポーツショップ海王白金", url:"https://kaio-sports.com/", addr:"港区白金6-14-2", plan:"シルバー（¥50,000）", reason:"白金エリアのスポーツ用品店。地域の中学生スポーツ大会協賛で地元顧客への貢献を示せる", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:169, cat:"スポーツ用品店", name:"トレイルブレイザースポーツ南青山", url:"https://trailblazer-sports.com/", addr:"港区南青山7-8-1", plan:"シルバー（¥50,000）", reason:"南青山エリアのスポーツ用品店。大会プログラム掲載で高感度エリア顧客への訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:170, cat:"スポーツ用品店", name:"インターナショナルスポーツ六本木", url:"https://int-sports-roppongi.com/", addr:"港区六本木4-9-2", plan:"シルバー（¥50,000）", reason:"六本木エリアのスポーツ用品店。大会協賛で多国籍エリアの顧客への訴求が可能", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:171, cat:"スポーツ用品店", name:"ペナルティ東京ショールーム", url:"https://www.penalty.jp/", addr:"港区南青山5-12-5", plan:"シルバー（¥50,000）", reason:"サッカーウェアブランドPENALTY。大会公式ユニフォームサプライヤーとして協賛価値が非常に高い", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:224, cat:"スポーツ用品店", name:"株式会社インパクトトレーディング", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"足とファンクショナルインソールの専門家。", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:225, cat:"スポーツ用品店", name:"ビバ！アイランドサンダル", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"メイドインジャパンのビーチサンダルブランド", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  // ── 整体系 ──
+  {no:72, cat:"整体系", name:"カラダファクトリー麻布十番店", url:"https://karadafactory.com/", addr:"港区麻布十番2-7-1", plan:"シルバー（¥50,000）", reason:"スポーツ整体大手チェーン。サッカー選手のコンディショニングテーマで協賛提案が刺さる", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:73, cat:"整体系", name:"カラダファクトリー白金高輪店", url:"https://karadafactory.com/", addr:"港区白金台4-9-2", plan:"シルバー（¥50,000）", reason:"大手整体チェーン白金高輪エリア。地域スポーツ支援で差別化できる", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:74, cat:"整体系", name:"カラダファクトリー六本木店", url:"https://karadafactory.com/", addr:"港区六本木6-10-1", plan:"シルバー（¥50,000）", reason:"六本木エリア大手整体。スポーツ大会スポンサーとして地域貢献をアピールできる", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:75, cat:"整体系", name:"整体院ほぐしの王様六本木店", url:"https://hogushi-osama.com/", addr:"港区六本木3-15-24", plan:"シルバー（¥50,000）", reason:"全国展開の整体チェーン。サッカー大会協賛で地域認知度向上が見込める", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"ねね"},
+  {no:76, cat:"整体系", name:"快眠整体院CURA青山店", url:"https://cura-aoyama.com/", addr:"港区南青山3-3-16", plan:"シルバー（¥50,000）", reason:"青山エリアの人気整体院。スポーツ後のケアとしてサッカー選手へのアプローチが効果的", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:77, cat:"整体系", name:"整骨院リハビリホームケア赤坂", url:"https://rehome-care.com/", addr:"港区赤坂3-21-7", plan:"シルバー（¥50,000）", reason:"赤坂エリアの整骨院。中学生スポーツ傷害予防テーマで協賛提案が有効", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:78, cat:"整体系", name:"スポーツ整体院Body Make港区田町", url:"https://bodymake-tamachi.com/", addr:"港区芝浦1-3-10", plan:"シルバー（¥50,000）", reason:"スポーツ特化整体院。サッカー選手のパフォーマンス向上を訴求できる", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:79, cat:"整体系", name:"たなか接骨院麻布", url:"https://tanaka-sekkotsuin.com/", addr:"港区元麻布2-4-8", plan:"シルバー（¥50,000）", reason:"地域密着型接骨院。地域スポーツ大会への協賛で地域貢献を示せる", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:80, cat:"整体系", name:"AXISカイロプラクティック青山", url:"https://axis-chiro.com/", addr:"港区南青山5-9-1", plan:"シルバー（¥50,000）", reason:"カイロプラクティック専門院。スポーツパフォーマンス向上訴求でアプローチ有効", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:81, cat:"整体系", name:"プレミアム整体サロンフィジオ六本木", url:"https://physio-roppongi.com/", addr:"港区六本木7-14-3", plan:"シルバー（¥50,000）", reason:"高級整体サロン。CSR活動として子どもスポーツ支援に関心が高い層にアピール", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  {no:82, cat:"整体系", name:"整体サロンRelax麻布十番", url:"https://relax-azabujuban.com/", addr:"港区麻布十番3-6-2", plan:"シルバー（¥50,000）", reason:"地域人気の整体サロン。大会プログラム広告で地域顧客への訴求が可能", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"ねね"},
+  // ── 学習塾（もか） ──
+  {no:15, cat:"学習塾", name:"栄光ゼミナール麻布十番校", url:"", addr:"港区麻布十番", plan:"シルバー（¥50,000）", reason:"赤坂中・青山中・御成門中など港区の中学生が多数通塾。大会の生徒層と完全一致", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:16, cat:"学習塾", name:"明光義塾麻布十番教室", url:"", addr:"港区麻布十番", plan:"シルバー（¥50,000）", reason:"港区内中学生が主要顧客層。「地元の子たちを応援」という文脈で協賛提案が刺さりやすい", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:17, cat:"学習塾", name:"TOMAS麻布校", url:"", addr:"港区麻布", plan:"シルバー（¥50,000）", reason:"個別指導の高級塾。保護者へのブランドPR機会として協賛価値を訴求する", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:18, cat:"学習塾", name:"個別教室のトライ麻布十番校", url:"", addr:"港区麻布十番", plan:"シルバー（¥50,000）", reason:"全国展開のブランド力あり。地域教室での協賛実績として訴求可能", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:19, cat:"学習塾", name:"早稲田アカデミー白金高輪校", url:"", addr:"港区白金高輪", plan:"シルバー（¥50,000）", reason:"港区の名門塾。文武両道をテーマにした協賛訴求が◎", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:20, cat:"学習塾", name:"早稲田アカデミー赤羽橋校", url:"", addr:"港区赤羽橋", plan:"シルバー（¥50,000）", reason:"港区内中学生が主要顧客。地域イベントへの協賛は教室の認知向上になる", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:21, cat:"学習塾", name:"日能研麻布十番校", url:"", addr:"港区麻布十番", plan:"シルバー（¥50,000）", reason:"中学受験塾として知名度高い。保護者向けのブランドPRとして協賛価値を打ち出す", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:22, cat:"学習塾", name:"麻布学院（南麻布校）", url:"", addr:"港区南麻布", plan:"シルバー（¥50,000）", reason:"地域密着の地元塾。少額から協賛しやすく、地域共同体として応じてくれやすい", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:23, cat:"学習塾", name:"坪田塾", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"ビリギャルの人の塾。電車の広告で見つけた。", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:172, cat:"学習塾", name:"SAPIXサピックス青山校", url:"https://www.sapix.co.jp/", addr:"港区南青山2-24-15", plan:"シルバー（¥50,000）", reason:"最難関中学受験塾。港区内在籍の中学生保護者への露出が非常に効果的", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:173, cat:"学習塾", name:"四谷大塚麻布十番校", url:"https://www.yotsuyaotsuka.com/", addr:"港区麻布十番1-3-2", plan:"シルバー（¥50,000）", reason:"名門中学受験塾。港区内の教育熱心な保護者へのアプローチとして協賛意義が高い", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:174, cat:"学習塾", name:"日能研白金高輪校", url:"https://www.nichinoken.co.jp/", addr:"港区高輪3-25-22", plan:"シルバー（¥50,000）", reason:"中学受験大手塾。地域の中学生スポーツ支援として保護者層への訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:175, cat:"学習塾", name:"早稲田アカデミー麻布校", url:"https://www.waseda-ac.co.jp/", addr:"港区麻布十番2-16-5", plan:"シルバー（¥50,000）", reason:"大手進学塾。港区内の保護者・中学生への認知度向上として協賛提案が刺さる", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:176, cat:"学習塾", name:"ena御三家附属中学校コース赤坂", url:"https://www.ena.co.jp/", addr:"港区赤坂3-14-8", plan:"シルバー（¥50,000）", reason:"進学塾ena赤坂校。地域の中学生スポーツ大会協賛で教育×スポーツのCSR訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:177, cat:"学習塾", name:"東進ハイスクール南青山校", url:"https://www.toshin.com/", addr:"港区南青山6-3-9", plan:"シルバー（¥50,000）", reason:"大手予備校チェーン。地域の中高生への直接訴求として大会協賛が非常に効果的", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:178, cat:"学習塾", name:"個別指導塾スタンダード港区芝浦校", url:"https://standard-ac.com/", addr:"港区芝浦3-15-4", plan:"シルバー（¥50,000）", reason:"個別指導塾。地域の中学生スポーツ支援として地域密着イメージの構築に有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:179, cat:"学習塾", name:"明光義塾麻布十番教室（2）", url:"https://www.meikogijuku.jp/", addr:"港区麻布十番3-4-7", plan:"シルバー（¥50,000）", reason:"全国展開の個別指導塾。大会協賛でエリアの中学生・保護者への認知度向上が見込める", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:180, cat:"学習塾", name:"グノーブル麻布本校", url:"https://www.gnoble.co.jp/", addr:"港区元麻布3-12-1", plan:"シルバー（¥50,000）", reason:"難関中学受験指導の名門塾。港区大会協賛で保護者層への強力なアプローチが可能", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:181, cat:"学習塾", name:"浜学園東京麻布校", url:"https://www.hamagaku.ac.jp/", addr:"港区麻布台2-5-3", plan:"シルバー（¥50,000）", reason:"関西系名門中学受験塾の東京校。教育熱心な保護者層への訴求として協賛が非常に有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:182, cat:"学習塾", name:"Z会東京麻布教室", url:"https://www.zkai.co.jp/", addr:"港区麻布十番4-1-8", plan:"シルバー（¥50,000）", reason:"高品質通信・対面指導のZ会。地域の中学生スポーツ支援として教育ブランド強化に有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:183, cat:"学習塾", name:"個別教室のトライ六本木校", url:"https://www.try-group.com/", addr:"港区六本木5-9-1", plan:"シルバー（¥50,000）", reason:"大手個別指導塾。六本木エリアの中学生・保護者への認知度向上として協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:184, cat:"学習塾", name:"TOMAS品川校", url:"https://www.tomas.co.jp/", addr:"品川区東品川3-1-1", plan:"シルバー（¥50,000）", reason:"完全個別指導の難関進学塾。港区近隣として地域スポーツ支援での訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:185, cat:"学習塾", name:"公文式麻布十番教室", url:"https://www.kumon.ne.jp/", addr:"港区麻布十番1-8-12", plan:"シルバー（¥50,000）", reason:"大手公文式学習教室。地域の子ども支援として大会協賛に高い親和性が期待できる", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:186, cat:"学習塾", name:"公文式三田教室", url:"https://www.kumon.ne.jp/", addr:"港区三田4-7-2", plan:"シルバー（¥50,000）", reason:"三田エリアの公文式教室。地域コミュニティとの関係強化として大会協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:187, cat:"学習塾", name:"スクールIE白金校", url:"https://www.school-ie.com/", addr:"港区白金1-21-5", plan:"シルバー（¥50,000）", reason:"個別指導塾スクールIE。白金エリアの保護者・中学生への訴求として協賛提案が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:188, cat:"学習塾", name:"代々木ゼミナール麻布校", url:"https://www.yozemi.ac.jp/", addr:"港区南麻布3-8-1", plan:"シルバー（¥50,000）", reason:"大手予備校。地域の中高生への直接訴求として大会協賛の意義が高い", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:189, cat:"学習塾", name:"駿台文庫麻布十番校", url:"https://www.sundai.ac.jp/", addr:"港区麻布十番2-12-7", plan:"シルバー（¥50,000）", reason:"大手予備校の麻布十番校。地域の中高生・保護者への認知度向上として協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:190, cat:"学習塾", name:"河合塾マナビス田町校", url:"https://www.manavis.com/", addr:"港区芝5-16-5", plan:"シルバー（¥50,000）", reason:"河合塾系列の映像授業塾。田町エリアの高校生・保護者への認知度向上として協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:191, cat:"学習塾", name:"進学塾VAMOS赤坂校", url:"https://vamos-edu.com/", addr:"港区赤坂7-5-3", plan:"シルバー（¥50,000）", reason:"スポーツと学習を両立する塾。サッカー大会協賛との親和性が非常に高い", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:192, cat:"学習塾", name:"英語学習塾イーオン麻布十番校", url:"https://www.aeonet.co.jp/", addr:"港区麻布十番3-8-4", plan:"シルバー（¥50,000）", reason:"英語特化学習塾。地域の中学生スポーツ支援として保護者への認知度向上が見込める", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:193, cat:"学習塾", name:"プログラミング教室TENTO六本木", url:"https://tento-lab.com/", addr:"港区六本木3-4-2", plan:"シルバー（¥50,000）", reason:"子ども向けプログラミング教室。地域スポーツ大会支援でSTEM×スポーツの訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:194, cat:"学習塾", name:"LITALICOワンダー青山", url:"https://wonder.litalico.jp/", addr:"港区南青山5-7-6", plan:"シルバー（¥50,000）", reason:"プログラミング・ものづくり教室。地域の中学生スポーツ支援として多様な子ども育成に貢献", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  {no:195, cat:"学習塾", name:"個別指導アップ学習会白金高輪校", url:"https://up-study.net/", addr:"港区高輪4-10-28", plan:"シルバー（¥50,000）", reason:"個別指導塾。高輪エリアの中学生・保護者への訴求として大会協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"もか"},
+  // ── 学習塾（岡本） ──
+  {no:196, cat:"学習塾", name:"栄光ゼミナール三田校", url:"https://www.eiko-net.com/", addr:"港区三田3-3-21", plan:"シルバー（¥50,000）", reason:"大手進学塾。三田エリアの保護者への訴求として地域スポーツ大会協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:197, cat:"学習塾", name:"秀英予備校品川校", url:"https://www.shuei-yobikou.co.jp/", addr:"品川区北品川1-2-8", plan:"シルバー（¥50,000）", reason:"大手予備校。港区近隣として地域の中高生への認知度向上として協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:198, cat:"学習塾", name:"鉄緑会東京校", url:"https://tetsurokukai.jp/", addr:"港区六本木3-9-8", plan:"シルバー（¥50,000）", reason:"東大受験指導の名門塾。保護者の教育意識が非常に高く大会協賛での訴求が効果的", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:199, cat:"学習塾", name:"馬渕教室東京麻布校", url:"https://www.mabuchi.co.jp/", addr:"港区麻布台3-1-5", plan:"シルバー（¥50,000）", reason:"関西系名門塾の東京進出校。地域の教育熱心な保護者への訴求として協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:200, cat:"学習塾", name:"ベスト個別指導学習塾白金校", url:"https://best-kobetsu.net/", addr:"港区白金4-13-6", plan:"シルバー（¥50,000）", reason:"個別指導学習塾。地域の中学生スポーツ大会協賛で地域貢献イメージの向上が見込める", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:201, cat:"学習塾", name:"個別指導教室Wam田町校", url:"https://www.i-wam.jp/", addr:"港区芝4-3-8", plan:"シルバー（¥50,000）", reason:"個別指導塾。田町・芝エリアの中学生・保護者への訴求として大会協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:202, cat:"学習塾", name:"湘南ゼミナール東京青山校", url:"https://www.shonan-seminar.com/", addr:"港区北青山1-4-6", plan:"シルバー（¥50,000）", reason:"進学塾の湘南ゼミナール。地域の中学生スポーツ支援として認知度向上が見込める", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:203, cat:"学習塾", name:"城南コベッツ高輪教室", url:"https://www.covez.jp/", addr:"港区高輪2-16-3", plan:"シルバー（¥50,000）", reason:"城南コベッツの個別指導塾。高輪エリアの保護者への訴求として大会協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:204, cat:"学習塾", name:"トライプラス港区麻布教室", url:"https://www.trygroup.com/plus/", addr:"港区麻布台1-9-10", plan:"シルバー（¥50,000）", reason:"完全個別指導塾。地域の中学生スポーツ大会支援として保護者への訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:205, cat:"学習塾", name:"個別指導塾ノーバス南青山校", url:"https://www.novas.co.jp/", addr:"港区南青山3-6-4", plan:"シルバー（¥50,000）", reason:"個別指導塾。南青山エリアの中学生・保護者への訴求として大会協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:206, cat:"学習塾", name:"ロボット教室STEM CELL麻布", url:"https://stem-cell-azabu.com/", addr:"港区麻布十番4-5-1", plan:"シルバー（¥50,000）", reason:"子ども向けロボット・STEM教室。地域スポーツ大会支援でテック×スポーツの訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:207, cat:"学習塾", name:"英進館青山校", url:"https://www.eishinkan.net/", addr:"港区北青山2-7-4", plan:"シルバー（¥50,000）", reason:"九州系難関進学塾の東京進出校。地域の教育熱心な保護者への認知度向上として協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:208, cat:"学習塾", name:"能開センター港区麻布校", url:"https://www.nokai.jp/", addr:"港区麻布台2-8-5", plan:"シルバー（¥50,000）", reason:"中学受験対応塾。地域の保護者・中学生への訴求として大会協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:209, cat:"学習塾", name:"Qゼミ白金高輪校", url:"https://www.qzemi.co.jp/", addr:"港区白金台5-1-3", plan:"シルバー（¥50,000）", reason:"個別指導・集団指導のQゼミ。白金高輪エリアの保護者への訴求として協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:210, cat:"学習塾", name:"個別指導オアシス港区三田校", url:"https://oasis-edu.com/", addr:"港区三田1-5-7", plan:"シルバー（¥50,000）", reason:"個別指導塾。三田エリアの中学生・保護者への訴求として大会協賛が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:211, cat:"学習塾", name:"スポーツ学習塾ドリーム赤坂", url:"https://dream-sports-edu.com/", addr:"港区赤坂9-1-12", plan:"シルバー（¥50,000）", reason:"スポーツと学習を両立する塾。サッカー大会協賛との親和性が非常に高い", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:212, cat:"学習塾", name:"KTC中央高等学院港区校", url:"https://www.ktc-school.com/", addr:"港区芝浦1-14-5", plan:"シルバー（¥50,000）", reason:"通信制高校サポート塾。地域の中高生スポーツ支援として協賛意義が高い", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:213, cat:"学習塾", name:"世田谷進学塾", url:"https://setagaya-shingaku.com/", addr:"世田谷区太子堂4-1-22", plan:"シルバー（¥50,000）", reason:"港区在住生徒が多い進学塾。大会プログラム広告で港区の保護者層へのアプローチが有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:214, cat:"学習塾", name:"俊英館麻布校", url:"https://www.shunneikan.co.jp/", addr:"港区麻布十番3-12-6", plan:"シルバー（¥50,000）", reason:"集団指導進学塾。地域の中学生スポーツ大会支援として保護者への認知度向上が見込める", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:215, cat:"学習塾", name:"学習塾スペックス六本木校", url:"https://specs-edu.com/", addr:"港区六本木1-5-6", plan:"シルバー（¥50,000）", reason:"六本木エリアの学習塾。大会協賛で地域の保護者・中学生への訴求が可能", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:216, cat:"学習塾", name:"個別指導塾ひとつ上の英語青山", url:"https://hito-eigo.com/", addr:"港区南青山4-8-7", plan:"シルバー（¥50,000）", reason:"英語特化個別指導塾。地域の中学生スポーツ大会支援として保護者への訴求が有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:217, cat:"学習塾", name:"中萩塾白金", url:"https://nakahagi-juku.com/", addr:"港区白金2-1-8", plan:"シルバー（¥50,000）", reason:"地域密着型の進学塾。地域の中学生スポーツ支援として長期的な地域貢献が可能", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:218, cat:"学習塾", name:"ハイブリッド塾CORE港区", url:"https://core-minato.com/", addr:"港区赤坂5-3-1", plan:"シルバー（¥50,000）", reason:"ハイブリッド型学習塾。地域スポーツ大会協賛でオフライン認知度の向上が期待できる", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:219, cat:"学習塾", name:"進学塾CREDO麻布十番", url:"https://credo-edu.com/", addr:"港区麻布十番2-8-12", plan:"シルバー（¥50,000）", reason:"難関校受験対応塾。地域の教育熱心な保護者への訴求として大会協賛が非常に有効", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  {no:220, cat:"学習塾", name:"アカデミア学習院白金台校", url:"https://academia-gakuinkai.com/", addr:"港区白金台2-9-1", plan:"シルバー（¥50,000）", reason:"難関中学受験指導塾。白金台エリアの高所得保護者層への強力なアプローチが可能", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"岡本"},
+  {no:221, cat:"学習塾", name:"開成教育グループ東京本部", url:"https://www.kaiseiedu.com/", addr:"港区六本木4-5-10", plan:"シルバー（¥50,000）", reason:"関西系難関受験塾の東京本部。地域の最上位教育層保護者への訴求として協賛価値が非常に高い", position:"", contact:"", tel:"", email:"", date:"", status:"未アプローチ", owner:"岡本"},
+  // ── SNS ──
+  {no:34, cat:"SNS", name:"ノーティス", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"フィジカルデータを測定する企業で多くの強豪校やクラブチームで導入している。昨年の9月まではジュニアユースでの測定も行っていた。", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:37, cat:"SNS", name:"XbotGo JP Official", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"AIでスポーツの感動を自動追尾する軽量カメラシステム", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:38, cat:"SNS", name:"Dream LINK", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"フットボール留学", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:39, cat:"SNS", name:"hacomono", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"運動スクール向けシステム、会員管理・予約・決済システム", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:40, cat:"SNS", name:"Spolish", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"サッカー・フットサルのチームを成長させ、運営を劇的に効率化するスポーツ管理プラットフォーム", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:43, cat:"SNS", name:"BAND JAPAN", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"グループ活動に必要な連絡アプリ", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:49, cat:"SNS", name:"LAB NAME", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"ネームチャームブランド。チームでお揃いにできる。", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:57, cat:"SNS", name:"スクメモ", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"写真を撮影してくれる", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:58, cat:"SNS", name:"soccerbee_japan", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"GPSで選手のデータを集める", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:64, cat:"SNS", name:"kenssports", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"イギリスサッカー留学エージェント", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+  {no:223, cat:"SNS", name:"株式会社ookami", url:"", addr:"", plan:"シルバー（¥50,000）", reason:"Player!のアプリで試合情報などが見れる。ジュニアユースや高校大学の試合まで掲載", position:"", contact:"", tel:"", email:"", date:"", status:"送信済み", owner:"朝"},
+];
+
+/* ── 状態 ── */
+let activeTab = 'all';
+let sortCol = 1, sortAsc = true;
+const selected = new Set();
+
+/* ── プランバッジ ── */
+function planBadge(plan) {
+  if (plan.includes('ゴールド'))  return `<span class="badge badge-gold">🥇 ゴールド</span>`;
+  if (plan.includes('シルバー')) return `<span class="badge badge-silver">🥈 シルバー</span>`;
+  return                                `<span class="badge badge-bronze">🥉 ブロンズ</span>`;
+}
+function statusBadge(s) {
+  if (s === '送信済み')  return `<span class="status-badge status-sent">✓ 送信済み</span>`;
+  if (s === '見こみなし') return `<span class="status-badge status-ng">✗ 見込なし</span>`;
+  return                        `<span class="status-badge status-unsent">◎ 未アプローチ</span>`;
+}
+
+/* ── テーブル描画 ── */
+function render() {
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  const q     = document.getElementById('search').value.trim().toLowerCase();
+  const fStat = document.getElementById('filter-status').value;
+  const fCat  = document.getElementById('filter-cat').value;
+  const fPlan = document.getElementById('filter-plan').value;
+
+  let rows = DATA.filter(d => {
+    if (activeTab !== 'all' && d.owner !== activeTab) return false;
+    if (fStat && d.status !== fStat) return false;
+    if (fCat  && d.cat   !== fCat)  return false;
+    if (fPlan && !d.plan.includes(fPlan)) return false;
+    if (q && !d.name.toLowerCase().includes(q) && !d.addr.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  rows.sort((a,b)=>{
+    const keys=['no','no','cat','name','plan','addr','url','reason','contact','tel','email','status','owner'];
+    const k=keys[sortCol]||'no';
+    const va = String(a[k]||''), vb = String(b[k]||'');
+    return sortAsc ? va.localeCompare(vb,'ja') : vb.localeCompare(va,'ja');
+  });
+
+  rows.forEach(d => {
+    const chk = selected.has(d.no);
+    const tr = document.createElement('tr');
+    if(chk) tr.classList.add('checked-row');
+    tr.dataset.no = d.no;
+    tr.innerHTML = `
+      <td class="chk-col"><input type="checkbox" onchange="toggleRow(${d.no},this)" ${chk?'checked':''}></td>
+      <td>${d.no}</td>
+      <td><span class="cat-badge">${d.cat}</span></td>
+      <td class="company-name">${d.name}</td>
+      <td>${planBadge(d.plan)}</td>
+      <td class="address">${d.addr||'—'}</td>
+      <td class="url">${d.url?`<a href="${d.url}" target="_blank" rel="noopener">🔗 開く</a>`:'—'}</td>
+      <td class="reason">${d.reason||'—'}</td>
+      <td>${d.contact||'—'}</td>
+      <td>${d.tel||'—'}</td>
+      <td>${d.email||'—'}</td>
+      <td>${statusBadge(d.status)}</td>
+      <td>${d.owner||'—'}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  updateStats();
+}
+
+/* ── 統計更新 ── */
+function updateStats() {
+  document.getElementById('cnt-total').textContent  = DATA.length;
+  document.getElementById('cnt-sent').textContent   = DATA.filter(d=>d.status==='送信済み').length;
+  document.getElementById('cnt-unsent').textContent = DATA.filter(d=>d.status==='未アプローチ').length;
+  document.getElementById('cnt-ng').textContent     = DATA.filter(d=>d.status==='見こみなし').length;
+}
+
+/* ── フィルター・タブ ── */
+function applyFilters() { render(); }
+function clearFilters() {
+  document.getElementById('search').value='';
+  document.getElementById('filter-status').value='';
+  document.getElementById('filter-cat').value='';
+  document.getElementById('filter-plan').value='';
+  render();
+}
+function switchTab(tab, el) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+/* ── ソート ── */
+function sortTable(col) {
+  if (sortCol===col) sortAsc=!sortAsc; else { sortCol=col; sortAsc=true; }
+  render();
+}
+
+/* ── 選択 ── */
+function toggleRow(no, cb) {
+  if(cb.checked) selected.add(no); else selected.delete(no);
+  const tr = cb.closest('tr');
+  tr.classList.toggle('checked-row', cb.checked);
+  updateActionBar();
+}
+function toggleAll(master) {
+  const cbs = document.querySelectorAll('#tbody input[type=checkbox]');
+  cbs.forEach(cb=>{
+    cb.checked = master.checked;
+    const no = Number(cb.closest('tr').dataset.no);
+    if(master.checked) selected.add(no); else selected.delete(no);
+    cb.closest('tr').classList.toggle('checked-row', master.checked);
+  });
+  updateActionBar();
+}
+function selectAll() {
+  DATA.forEach(d=>selected.add(d.no));
+  render();
+  updateActionBar();
+}
+function clearSelection() {
+  selected.clear();
+  document.querySelectorAll('#tbody input[type=checkbox]').forEach(cb=>cb.checked=false);
+  document.querySelectorAll('#tbody tr').forEach(tr=>tr.classList.remove('checked-row'));
+  document.getElementById('check-all').checked=false;
+  updateActionBar();
+}
+function updateActionBar() {
+  const bar = document.getElementById('action-bar');
+  const cnt = selected.size;
+  document.getElementById('selected-count').textContent = cnt+'件選択中';
+  bar.classList.toggle('visible', cnt>0);
+}
+
+/* ── 書き出し ── */
+function exportSelected() {
+  const list = DATA.filter(d=>selected.has(d.no));
+  const lines = list.map(d=>`No.${d.no}\t${d.cat}\t${d.name}\t${d.plan}\t${d.addr||''}\t${d.url||''}\t${d.status}\t${d.owner}`);
+  const text = '番号\tカテゴリ\t企業名\tプラン\t住所\tURL\tステータス\t担当\n' + lines.join('\n');
+  const blob = new Blob(['﻿'+text],{type:'text/tab-separated-values;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '協賛送付リスト.tsv';
+  a.click();
+}
+
+/* ── 初期化 ── */
+render();
+</script>
+</body>
+</html>
