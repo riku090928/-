@@ -1,0 +1,31 @@
+[project]
+name = "remix-finder"
+version = "0.1.0"
+description = "リミックス動画から原曲とビートの元ネタを探すローカルWebアプリ"
+requires-python = ">=3.10"
+dependencies = [
+    "demucs==4.1.0",
+    # demucs の依存指定だけだと古い torch が選ばれ numpy も入らないため明示する
+    "torch>=2.5",
+    "numpy>=1.26",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.9",
+    "python-dotenv>=1.0",
+    "requests>=2.31",
+]
+
+[tool.uv]
+package = false
+# 依頼者のWindows PC（と開発用のLinux / Apple Silicon Mac）だけを対象にする
+environments = [
+    "sys_platform == 'win32'",
+    "sys_platform == 'linux'",
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
