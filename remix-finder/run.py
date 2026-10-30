@@ -7,7 +7,7 @@ import webbrowser
 
 import uvicorn
 
-from app.config import load_settings
+from app.config import ROOT, load_settings
 
 
 def port_in_use(port: int) -> bool:
@@ -22,6 +22,24 @@ def already_running(url: str) -> bool:
             return r.status == 200
     except Exception:
         return False
+
+
+def print_env_status() -> None:
+    """今のモードと .env の状態を表示する（設定が反映されないときの手がかり）。"""
+    s = load_settings()
+    if s.audd_mode == "real":
+        print(f"  モード: 本番（AudD に問い合わせます。1本あたり最大 {s.max_requests_per_video} 回）\n")
+        return
+    print("  モード: ダミー（AudD は呼びません）")
+    if (ROOT / ".env.txt").exists():
+        print("  ※ .env.txt というファイルがあります。名前を .env に変えてください。")
+    elif not (ROOT / ".env").exists():
+        print("  ※ .env が見つかりません。start.bat と同じフォルダに .env を置いてください。")
+    elif s.audd_api_token:
+        print("  ※ APIキーは入っています。本番にするには .env の AUDD_MODE=real にしてください。")
+    else:
+        print("  ※ 本番にするには .env に AUDD_API_TOKEN と AUDD_MODE=real を書いてください。")
+    print()
 
 
 if __name__ == "__main__":
@@ -41,5 +59,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print(f"\n  リミックス楽曲ファインダーを起動しました → {url}\n  終了するときはこの黒い画面を閉じてください。\n")
+    print_env_status()
     threading.Timer(1.5, lambda: webbrowser.open(url)).start()
     uvicorn.run("app.main:app", host="127.0.0.1", port=port, log_level="warning")
