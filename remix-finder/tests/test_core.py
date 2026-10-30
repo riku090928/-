@@ -96,7 +96,9 @@ def test_dummy_mode_never_calls_api(tmp_path, mp3):
 
 def test_clip_starts_and_thin_out():
     assert audio.clip_starts(10, 12, 20) == [0.0]
-    assert audio.clip_starts(70, 12, 20) == [0.0, 20.0, 40.0, 58.0]
+    assert audio.clip_starts(130, 12, 20) == [0.0, 20.0, 40.0, 60.0, 80.0, 100.0, 118.0]
+    # 短い動画でも4か所は調べる
+    assert audio.clip_starts(30, 12, 20) == [0.0, 6.0, 12.0, 18.0]
     assert audio.thin_out(list(range(10)), 3) == [0, 4, 9]
     assert audio.thin_out([1, 2], 5) == [1, 2]
 
@@ -120,3 +122,43 @@ def test_speed_correction_restores_pitch_and_tempo(tmp_path):
     assert abs(hz - 440) < 3
     assert abs(dur - 12) < 0.1
     assert audio.loudness_db(out) > -45  # 無音扱いにならない
+
+
+class ScriptedClient:
+    """source と速度に応じて決まった答えを返す（パイプラインの判定ロジック確認用）。"""
+    mode, budget, requests_used, cache_hits = "real", 99, 0, 0
+
+    def __init__(self, tmp_path, answer):
+        self.answer = answer
+        self.cache = ResultCache(tmp_path / "c")
+
+    def recognize(self, mp3, key, hint):
+        self.requests_used += 1
+        return self.answer(hint["source"], hint["speed"], hint["index"])
+
+
+def test_single_wrong_hit_still_tries_speed_correction(tmp_path, monkeypatch):
+    """ボーカルで1か所だけ別の曲が出ても、速度補正で正解を探しに行くこと。"""
+    from app.audd import Song
+    from app.config import Settings
+    from app.pipeline import Analyzer
+
+    monkeypatch.setenv("REMIX_FINDER_FAKE_SEPARATION", "1")
+    video = tmp_path / "in.mp4"
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "sine=f=500:d=30",
+                    "-ar", "44100", "-ac", "2", str(video)], check=True)
+    wrong, right = Song("Wrong", "X"), Song("Just Friends (Sunny)", "Musiq Soulchild")
+
+    def answer(source, speed, index):
+        if source == "vocals" and speed == 1.0 and index == 0:
+            return wrong
+        if source == "vocals" and speed == 1.25:
+            return right
+        return None
+
+    s = Settings(speed_factors=[1.25], max_requests_per_video=99)
+    client = ScriptedClient(tmp_path, answer)
+    result = Analyzer(s, client, "h", tmp_path, lambda m: None).run(video)
+    top = result["vocal"][0]
+    assert top["title"] == "Just Friends (Sunny)" and top["confident"]
+    assert result["vocal"][1]["title"] == "Wrong" and not result["vocal"][1]["confident"]

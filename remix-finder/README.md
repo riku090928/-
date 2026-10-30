@@ -87,6 +87,7 @@ AudD の無料枠は回数と期限が限られているので、次の仕組み
 |---|---|---|
 | `clip_seconds` | 1回に送る長さ（秒） | 12 |
 | `interval_seconds` | 何秒ごとに切り出すか | 20 |
+| `min_positions` | 短い動画でも最低この数の場所は調べる | 4 |
 | `max_requests_per_video` | 1本あたりの AudD の上限回数 | 30 |
 | `speed_factors` | 速度補正で試す倍率（左から順に試す） | 1.25, 0.8, 1.2, … |
 | `speed_probe_clips` | 1つの倍率につき何か所試すか | 2 |

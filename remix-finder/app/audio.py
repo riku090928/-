@@ -73,11 +73,17 @@ def loudness_db(path: Path) -> float:
     return 20 * math.log10(rms) if rms > 0 else -math.inf
 
 
-def clip_starts(duration: float, clip_len: float, interval: float) -> list[float]:
-    """音声全体を一定間隔で切り出すときの開始位置（秒）。"""
+def clip_starts(duration: float, clip_len: float, interval: float, min_positions: int = 4) -> list[float]:
+    """音声全体を一定間隔で切り出すときの開始位置（秒）。
+
+    短い動画（TikTok など）でも min_positions か所は調べられるよう、
+    必要なら間隔を詰める（クリップ同士が重なってもよい）。
+    """
     if duration <= clip_len:
         return [0.0]
     last = duration - clip_len
+    if min_positions > 1:
+        interval = min(interval, max(3.0, last / (min_positions - 1)))
     starts = []
     t = 0.0
     while t <= last + 1e-6:

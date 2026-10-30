@@ -149,7 +149,7 @@ function songHtml(s) {
   ].filter(Boolean).join("");
   const found = s.found.map(f => `${f.time}（${f.method}・${f.source}${speedText(f.speed)}）`).join("、");
   return `<div class="song">
-    <div class="title">${esc(s.title)}</div>
+    <div class="title">${esc(s.title)}${s.confident ? "" : ' <span class="badge warn">候補（1か所だけで検出・誤判定の可能性あり）</span>'}</div>
     <div class="artist">${esc(s.artist)}${s.album ? " ／ " + esc(s.album) : ""}</div>
     <div class="links">${links || '<span class="none">リンクは見つかりませんでした</span>'}</div>
     <div class="found">見つかった位置：${esc(found)}</div>

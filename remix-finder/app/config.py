@@ -19,6 +19,7 @@ class Settings:
     audd_mode: str = "dummy"  # "dummy"（APIを呼ばない） or "real"
     clip_seconds: float = 12.0
     interval_seconds: float = 20.0
+    min_positions: int = 4
     max_requests_per_video: int = 30
     speed_factors: list[float] = field(default_factory=lambda: [1.25, 0.8])
     speed_probe_clips: int = 2
@@ -49,6 +50,7 @@ def load_settings() -> Settings:
         audd_mode=mode,
         clip_seconds=float(a.get("clip_seconds", d.clip_seconds)),
         interval_seconds=float(a.get("interval_seconds", d.interval_seconds)),
+        min_positions=int(a.get("min_positions", d.min_positions)),
         max_requests_per_video=int(a.get("max_requests_per_video", d.max_requests_per_video)),
         speed_factors=factors or d.speed_factors,
         speed_probe_clips=int(a.get("speed_probe_clips", d.speed_probe_clips)),

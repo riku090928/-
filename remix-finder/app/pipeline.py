@@ -100,7 +100,8 @@ class Analyzer:
         video.unlink(missing_ok=True)   # 動画は音声を取り出したら不要
         duration = audio.wav_duration(mix)
 
-        all_starts = audio.clip_starts(duration, self.s.clip_seconds, self.s.interval_seconds)
+        all_starts = audio.clip_starts(duration, self.s.clip_seconds, self.s.interval_seconds,
+                                       self.s.min_positions)
         # 3種類（そのまま・ボーカル・ビート）に配り、残りを速度補正用に取っておく
         per_source = max(1, self.s.max_requests_per_video // 4)
         starts = audio.thin_out(all_starts, per_source)
@@ -124,8 +125,9 @@ class Analyzer:
             self.progress(f"分離した{SOURCE_LABELS[source]}で曲を探しています…")
             self._scan(path, source, "separated", starts)
 
-        # 4. 速度補正して認識（まだ見つかっていない側だけ）
-        targets = {s: p for s, p in stems.items() if not any(h.source == s for h in self.hits)}
+        # 4. 速度補正して認識（まだ確かな曲が見つかっていない側だけ）
+        #    1か所だけの検出は誤判定のことがあるので、見つかったとはみなさない
+        targets = {s: p for s, p in stems.items() if not self._confirmed(s, len(starts))}
         if not stems and not self.hits:
             targets = {"mix": mix}
         for source, path in targets.items():
@@ -139,6 +141,15 @@ class Analyzer:
         mix.unlink(missing_ok=True)
 
         return self._summary(duration)
+
+    def _confirmed(self, source: str, n_positions: int) -> bool:
+        """source で同じ曲が2か所以上見つかっているか（調べた場所が1か所なら1回でよい）。"""
+        need = 1 if n_positions <= 1 else 2
+        counts: dict[str, int] = {}
+        for h in self.hits:
+            if h.source == source:
+                counts[h.song.key] = counts.get(h.song.key, 0) + 1
+        return any(c >= need for c in counts.values())
 
     def _speed_search(self, path: Path, source: str, starts: list[float]) -> None:
         probes = audio.thin_out(starts, self.s.speed_probe_clips)
@@ -168,7 +179,8 @@ class Analyzer:
             })
         out = sorted(groups.values(), key=lambda g: -g["_n"])
         for g in out:
-            g.pop("_n")
+            # 1か所だけの検出は「候補」として扱う（誤判定の可能性がある）
+            g["confident"] = g.pop("_n") >= 2
         return out
 
     def _summary(self, duration: float) -> dict:
